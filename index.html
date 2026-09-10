@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="theme-color" content="#08111f"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="AI Borsa Radar"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Global AI Borsa Radar</title>
+<style>
+:root{--bg:#08111f;--card:#101c2d;--card2:#14243a;--text:#eef5ff;--muted:#8fa5bd;--green:#20d68b;--red:#ff5d70;--yellow:#ffc857;--line:#22344c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+header{padding:20px 16px 12px;position:sticky;top:0;background:rgba(8,17,31,.94);backdrop-filter:blur(14px);z-index:5;border-bottom:1px solid var(--line)}
+h1{font-size:22px;margin:0 0 5px}.sub{font-size:12px;color:var(--muted)}
+.wrap{max-width:760px;margin:auto;padding:14px 14px 90px}.row{display:flex;gap:8px;overflow:auto;padding-bottom:5px}
+button,.chip{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:9px 12px;white-space:nowrap}
+button.active,.chip.active{background:var(--card2);border-color:#4e6f96}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.metric{font-size:25px;font-weight:700}.muted{color:var(--muted);font-size:12px}
+.section{margin-top:18px}.section h2{font-size:16px;margin:0 0 9px}
+.stock{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}
+.stock:last-child{border-bottom:0}.ticker{font-weight:700}.name{font-size:11px;color:var(--muted);margin-top:3px}
+.score{font-weight:800}.up{color:var(--green)}.down{color:var(--red)}.warn{color:var(--yellow)}
+.bar{height:7px;background:#1b2a3d;border-radius:9px;overflow:hidden;margin-top:7px}.fill{height:100%;border-radius:9px}
+.search{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:white;margin:10px 0}
+.chart{height:190px;border:1px solid var(--line);border-radius:14px;background:#0b1727;position:relative;overflow:hidden}
+canvas{width:100%;height:100%}.note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px}
+.bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(8,17,31,.96);border-top:1px solid var(--line);padding:9px;display:flex;justify-content:center;z-index:5}
+.bottom span{font-size:11px;color:var(--muted)}
+@media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header><div class="wrap" style="padding:0 14px">
+<h1>🌎 Global AI Borsa Radar</h1><div class="sub">Mobil panel • demo veri • AI skor altyapısı hazır</div>
+</div></header>
+<main class="wrap">
+<div class="row" id="markets"></div>
+<input class="search" id="search" placeholder="Hisse ara: NVDA, AAPL, TSLA...">
+<div class="grid">
+<div class="card"><div class="muted">Tarama</div><div class="metric">1.284</div><div class="muted">sembol</div></div>
+<div class="card"><div class="muted">Pozitif aday</div><div class="metric up">146</div><div class="muted">AI filtresi</div></div>
+<div class="card"><div class="muted">Riskli</div><div class="metric down">93</div><div class="muted">AI filtresi</div></div>
+<div class="card"><div class="muted">Son güncelleme</div><div class="metric" style="font-size:18px">demo</div><div class="muted">gerçek API bağlanınca canlı</div></div>
+</div>
+
+<section class="section"><h2>📈 En güçlü yükseliş adayları</h2><div class="card" id="bull"></div></section>
+<section class="section"><h2>📉 En yüksek düşüş riski</h2><div class="card" id="bear"></div></section>
+
+<section class="section"><h2>🔎 Hisse analizi</h2>
+<div class="card">
+<div id="detail"><b>NVDA</b><div class="muted">NVIDIA • NASDAQ</div>
+<div class="grid">
+<div><span class="muted">AI Skoru</span><div class="metric up">91/100</div></div>
+<div><span class="muted">Yükseliş</span><div class="metric up">%78</div></div>
+<div><span class="muted">Düşüş riski</span><div class="metric down">%22</div></div>
+<div><span class="muted">RSI</span><div class="metric">64</div></div>
+</div>
+<div class="chart"><canvas id="chart"></canvas></div>
+<p class="note">Örnek açıklama: momentum pozitif, kısa/orta vadeli trend yukarı ve hacim güçlü. Bu paneldeki skorlar demo amaçlıdır; yatırım tavsiyesi değildir.</p>
+</div></div></section>
+
+<section class="section"><h2>⚙️ Veri bağlantısı</h2>
+<div class="card"><b>Gerçek veri aşaması</b><p class="note">Panel hazır. Canlı veri için API anahtarı ve veri lisansı bağlanacak. Küresel kapsama için Alpha Vantage veya Twelve Data gibi sağlayıcılar kullanılabilir. Sağlayıcının gerçek-zamanlı kapsamı borsaya göre değişebilir.</p></div>
+</section>
+</main>
+<div class="bottom"><span>AI Radar • Gerçek zamanlı veri bağlandığında skorlar otomatik yenilenecek</span></div>
+
+<script>
+const data=[
+["NVDA","NVIDIA","NASDAQ",91,78,"up"],["AMD","Advanced Micro Devices","NASDAQ",87,72,"up"],
+["TSM","Taiwan Semiconductor","NYSE",85,69,"up"],["MSFT","Microsoft","NASDAQ",82,67,"up"],
+["AVGO","Broadcom","NASDAQ",80,65,"up"],["TSLA","Tesla","NASDAQ",74,61,"up"],
+["XYZ","Demo Risk Corp.","NYSE",18,79,"down"],["ABC","Demo Weak Inc.","NASDAQ",24,74,"down"],
+["DEF","Demo Retail","NYSE",29,71,"down"],["GHI","Demo Tech","NASDAQ",33,68,"down"]
+];
+function render(list,id,down=false){
+ document.getElementById(id).innerHTML=list.map(x=>`<div class="stock" onclick="selectStock('${x[0]}')"><div><div class="ticker">${x[0]}</div><div class="name">${x[1]} • ${x[2]}</div></div><div style="width:42%;text-align:right"><div class="score ${down?'down':'up'}">${down?100-x[3]:x[3]}/100</div><div class="muted">${down?'Düşüş riski':'Yükseliş'} ${down?'%'+x[4]:'%'+x[4]}</div><div class="bar"><div class="fill" style="width:${down?100-x[3]:x[3]}%;background:${down?'var(--red)':'var(--green)'}"></div></div></div></div>`).join('');
+}
+render(data.slice(0,6),"bull"); render(data.slice(6),"bear",true);
+document.getElementById("markets").innerHTML=["Global","ABD","Avrupa","Asya","Kripto","Forex","Emtia"].map((x,i)=>`<button class="${i===0?'active':''}" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active')">${x}</button>`).join('');
+document.getElementById("search").addEventListener("input",e=>{
+ const q=e.target.value.toUpperCase(); if(!q)return;
+ const x=data.find(a=>a[0].includes(q)); if(x)selectStock(x[0]);
+});
+function selectStock(t){
+ const x=data.find(a=>a[0]===t)||data[0];
+ document.getElementById("detail").innerHTML=`<b>${x[0]}</b><div class="muted">${x[1]} • ${x[2]}</div>
+ <div class="grid"><div><span class="muted">AI Skoru</span><div class="metric ${x[5]}">${x[3]}/100</div></div>
+ <div><span class="muted">Yükseliş</span><div class="metric up">%${x[4]}</div></div>
+ <div><span class="muted">Düşüş riski</span><div class="metric down">%${100-x[4]}</div></div>
+ <div><span class="muted">RSI</span><div class="metric">${Math.round(40+x[3]*.27)}</div></div></div>
+ <div class="chart"><canvas id="chart"></canvas></div>
+ <p class="note">Demo AI açıklaması. Gerçek model bağlandığında teknik göstergeler, haber/sentiment, temel veriler ve geçmiş benzer sinyaller birlikte değerlendirilecek.</p>`;
+ drawChart();
+}
+function drawChart(){
+ const c=document.getElementById("chart"); if(!c)return; const r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;
+ const g=c.getContext("2d");g.scale(d,d);let w=r.width,h=r.height;g.strokeStyle="#2b4765";g.lineWidth=1;
+ for(let y=20;y<h;y+=35){g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke()}
+ g.strokeStyle="#20d68b";g.lineWidth=2;g.beginPath();for(let i=0;i<70;i++){let x=i*(w/69),y=h-35-(Math.sin(i/5)*12+i*1.55);if(i===0)g.moveTo(x,y);else g.lineTo(x,y)}g.stroke();
+}
+drawChart();
+</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}</script></body></html>
