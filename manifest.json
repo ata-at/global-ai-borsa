@@ -1,17 +1,10 @@
 {
-  "name": "Global AI Borsa Radar",
-  "short_name": "AI Borsa Radar",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#08111f",
-  "theme_color": "#08111f",
-  "lang": "tr",
-  "icons": [
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  "id":"./",
+  "name":"Global AI Borsa",
+  "short_name":"AI Borsa",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#080a0f",
+  "theme_color":"#0b0d12",
+  "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
