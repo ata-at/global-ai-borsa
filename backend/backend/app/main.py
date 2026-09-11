@@ -1,4 +1,5 @@
 import os, asyncio
+import urllib.parse
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +12,7 @@ LAST = {}
 task = None
 
 def watchlist():
-    return [x.strip() for x in os.getenv("WATCHLIST","").split(",") if x.strip()]
+    return [x.strip() for x in os.getenv("WATCHLIST", "").split(",") if x.strip()]
 
 class Subscription(BaseModel):
     endpoint: str
@@ -19,80 +20,70 @@ class Subscription(BaseModel):
 
 async def scan_once():
     td = TwelveData()
-    threshold = float(os.getenv("MIN_SCORE_FOR_PUSH","78"))
-    for symbol in watchlist():
+    symbols = watchlist()
+    if not symbols:
+        return
+    for symbol in symbols:
         try:
-            df = await td.time_series(symbol, "1min", 250)
-            result = analyze(df)
-            LAST[symbol] = result
-            if result["signal"] == "BUY_ZONE" and result["score"] >= threshold:
-                send_push(
-                    f"AI Borsa: {symbol}",
-                    f"Skor {result['score']} | Giriş {result['entry_zone'][0]}–{result['entry_zone'][1]}",
-                    f"/?symbol={symbol}"
-                )
+            data = td.get_prices(symbol)
+            if not data:
+                continue
+            score_data = analyze(data)
+            LAST[symbol] = score_data
+            if score_data.get("action") in ["BUY", "SELL"]:
+                await send_push(f"{symbol}: {score_data['action']} Signal! AI Score: {score_data['score']}")
         except Exception as e:
-            LAST[symbol] = {"error": str(e)}
+            print(f"Error scanning {symbol}: {e}")
 
-async def loop():
-    interval = int(os.getenv("SCAN_INTERVAL_SECONDS","60"))
+async def scanner_loop():
     while True:
-        try: await scan_once()
-        except Exception as e: print("scanner:", e)
-        await asyncio.sleep(interval)
+        try:
+            await scan_once()
+        except Exception as e:
+            print(f"Scanner error: {e}")
+        await asyncio.sleep(60)
 
 @asynccontextmanager
-async def lifespan(app):
+async def lifespan(app: FastAPI):
     global task
-    task = asyncio.create_task(loop())
+    task = asyncio.create_task(scanner_loop())
     yield
-    task.cancel()
+    if task:
+        task.cancel()
 
-app = FastAPI(title="Global AI Borsa API", lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
 
-origins = [x.strip() for x in os.getenv("ALLOWED_ORIGINS","*").split(",") if x.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/health")
-async def health():
-    return {"ok":True,"watchlist":watchlist(),"cached":len(LAST)}
-
-@app.get("/signals")
-async def signals():
-    return {"signals":LAST}
-
-@app.get("/signal/{symbol:path}")
-async def signal(symbol):
-    if symbol in LAST and "error" not in LAST[symbol]:
+@app.get("/signal/{symbol}")
+async def get_signal(symbol: str):
+    symbol = urllib.parse.unquote(symbol)
+    if symbol in LAST:
         return LAST[symbol]
-    try:
-        df = await TwelveData().time_series(symbol, "1min", 250)
-        result = analyze(df); LAST[symbol] = result
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    td = TwelveData()
+    data = td.get_prices(symbol)
+    if not data:
+        raise HTTPException(status_code=404, detail="Symbol not found")
+    score_data = analyze(data)
+    LAST[symbol] = score_data
+    return score_data
 
-@app.get("/chart/{symbol:path}")
-async def chart(symbol):
-    try:
-        df = await TwelveData().time_series(symbol, "1min", 250)
-        result = analyze(df)
-        candles = [{
-            "time":int(r.datetime.timestamp()),
-            "open":float(r.open),"high":float(r.high),
-            "low":float(r.low),"close":float(r.close),
-            "volume":float(r.volume) if hasattr(r,"volume") and r.volume == r.volume else 0
-        } for r in df.tail(180).itertuples(index=False)]
-        return {"symbol":symbol,"candles":candles,"levels":result}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+@app.get("/chart/{symbol}")
+async def get_chart(symbol: str):
+    symbol = urllib.parse.unquote(symbol)
+    td = TwelveData()
+    data = td.get_prices(symbol)
+    if not data:
+        raise HTTPException(status_code=404, detail="Symbol not found")
+    return data
 
-@app.post("/push/subscribe")
+@app.post("/subscribe")
 async def subscribe(sub: Subscription):
-    save_subscription(sub.model_dump())
-    return {"ok":True}
-
-@app.post("/scan")
-async def manual_scan():
-    await scan_once()
-    return {"ok":True,"signals":LAST}
+    save_subscription(sub.dict())
+    return {"status": "ok"}
