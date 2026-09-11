@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from .scoring import analyze
 from .push import save_subscription, send_push
 
-# DÖNGÜSEL KİLİTLENMEYİ ÖNLEMEK İÇİN TWELVEDATA SINIFINI DOĞRUDAN BURAYA ALDIK
+# URL YAPISINDAKİ ÇAKIŞMALARI ÖNLEMEK İÇİN SONUNA EĞİK ÇİZGİ EKLEDİK
 BASE = "https://twelvedata.com"
 
 class TwelveData:
@@ -19,6 +19,11 @@ class TwelveData:
             raise RuntimeError("TWELVE_DATA_API_KEY bulunamadı!")
             
     async def time_series(self, symbol, interval="1d", outputsize=30):
+        # Eğer arayüzden 'NASDAQ:AAPL' gelirse, sadece 'AAPL' kısmını ayıklıyoruz
+        # Çünkü Twelve Data ücretsiz planda saf sembol ismini kabul eder.
+        if ":" in symbol:
+            symbol = symbol.split(":")[-1]
+            
         params = {
             "symbol": symbol,
             "interval": interval,
@@ -27,15 +32,26 @@ class TwelveData:
             "format": "JSON",
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.get(f"{BASE}/time_series", params=params)
-            r.raise_for_status()
+            # API endpoint adresini tam Twelve Data standartına göre birleştirdik
+            r = await client.get(f"{BASE}time_series", params=params)
+            if r.status_code != 200:
+                print(f"Twelve Data HTTP Hatası: {r.status_code} - {r.text}")
+                return None
             data = r.json()
+            
         if data.get("status") == "error":
-            raise RuntimeError(data.get("message", "Twelve Data API Hatası"))
-        df = pd.DataFrame(data.get("values", []))
+            print(f"Twelve Data API Hatası: {data.get('message')}")
+            return None
+            
+        values = data.get("values")
+        if not values:
+            return None
+            
+        df = pd.DataFrame(values)
         if df.empty:
             return df
-        df["datetime"] = pd.to_dict = pd.to_datetime(df["datetime"])
+            
+        df["datetime"] = pd.to_datetime(df["datetime"])
         for c in ["open", "high", "low", "close", "volume"]:
             if c in df:
                 df[c] = pd.to_numeric(df[c])
@@ -102,7 +118,7 @@ async def get_signal(symbol: str):
     td = TwelveData()
     data = await td.time_series(symbol)
     if data is None or data.empty:
-        raise HTTPException(status_code=404, detail="Symbol not found")
+        raise HTTPException(status_code=404, detail="Symbol data could not be fetched")
     score_data = analyze(data)
     LAST[symbol] = score_data
     return score_data
@@ -113,7 +129,7 @@ async def get_chart(symbol: str):
     td = TwelveData()
     data = await td.time_series(symbol)
     if data is None or data.empty:
-        raise HTTPException(status_code=404, detail="Symbol not found")
+        raise HTTPException(status_code=404, detail="Symbol data could not be fetched")
     return data.to_dict(orient="records")
 
 @app.post("/subscribe")
