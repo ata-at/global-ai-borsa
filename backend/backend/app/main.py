@@ -1,12 +1,45 @@
 import os, asyncio
 import urllib.parse
+import httpx
+import pandas as pd
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from .market import TwelveData
 from .scoring import analyze
 from .push import save_subscription, send_push
+
+# DÖNGÜSEL KİLİTLENMEYİ ÖNLEMEK İÇİN TWELVEDATA SINIFINI DOĞRUDAN BURAYA ALDIK
+BASE = "https://twelvedata.com"
+
+class TwelveData:
+    def __init__(self):
+        self.key = os.getenv("TWELVE_DATA_API_KEY")
+        if not self.key:
+            raise RuntimeError("TWELVE_DATA_API_KEY bulunamadı!")
+            
+    async def time_series(self, symbol, interval="1d", outputsize=30):
+        params = {
+            "symbol": symbol,
+            "interval": interval,
+            "outputsize": outputsize,
+            "apikey": self.key,
+            "format": "JSON",
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(f"{BASE}/time_series", params=params)
+            r.raise_for_status()
+            data = r.json()
+        if data.get("status") == "error":
+            raise RuntimeError(data.get("message", "Twelve Data API Hatası"))
+        df = pd.DataFrame(data.get("values", []))
+        if df.empty:
+            return df
+        df["datetime"] = pd.to_dict = pd.to_datetime(df["datetime"])
+        for c in ["open", "high", "low", "close", "volume"]:
+            if c in df:
+                df[c] = pd.to_numeric(df[c])
+        return df.sort_values("datetime").reset_index(drop=True)
 
 LAST = {}
 task = None
@@ -25,7 +58,6 @@ async def scan_once():
         return
     for symbol in symbols:
         try:
-            # Hatalı get_prices yerine doğru time_series eklendi
             data = await td.time_series(symbol)
             if data is None or data.empty:
                 continue
@@ -68,7 +100,6 @@ async def get_signal(symbol: str):
     if symbol in LAST:
         return LAST[symbol]
     td = TwelveData()
-    # Hatalı get_prices yerine doğru time_series eklendi
     data = await td.time_series(symbol)
     if data is None or data.empty:
         raise HTTPException(status_code=404, detail="Symbol not found")
@@ -80,11 +111,9 @@ async def get_signal(symbol: str):
 async def get_chart(symbol: str):
     symbol = urllib.parse.unquote(symbol)
     td = TwelveData()
-    # Hatalı get_prices yerine doğru time_series eklendi
     data = await td.time_series(symbol)
     if data is None or data.empty:
         raise HTTPException(status_code=404, detail="Symbol not found")
-    # Pandas veri yapısını frontend uyumlu hale getiriyoruz
     return data.to_dict(orient="records")
 
 @app.post("/subscribe")
