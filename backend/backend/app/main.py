@@ -25,8 +25,9 @@ async def scan_once():
         return
     for symbol in symbols:
         try:
-            data = td.get_prices(symbol)
-            if not data:
+            # Hatalı get_prices yerine doğru time_series eklendi
+            data = await td.time_series(symbol)
+            if data is None or data.empty:
                 continue
             score_data = analyze(data)
             LAST[symbol] = score_data
@@ -67,8 +68,9 @@ async def get_signal(symbol: str):
     if symbol in LAST:
         return LAST[symbol]
     td = TwelveData()
-    data = td.get_prices(symbol)
-    if not data:
+    # Hatalı get_prices yerine doğru time_series eklendi
+    data = await td.time_series(symbol)
+    if data is None or data.empty:
         raise HTTPException(status_code=404, detail="Symbol not found")
     score_data = analyze(data)
     LAST[symbol] = score_data
@@ -78,10 +80,12 @@ async def get_signal(symbol: str):
 async def get_chart(symbol: str):
     symbol = urllib.parse.unquote(symbol)
     td = TwelveData()
-    data = td.get_prices(symbol)
-    if not data:
+    # Hatalı get_prices yerine doğru time_series eklendi
+    data = await td.time_series(symbol)
+    if data is None or data.empty:
         raise HTTPException(status_code=404, detail="Symbol not found")
-    return data
+    # Pandas veri yapısını frontend uyumlu hale getiriyoruz
+    return data.to_dict(orient="records")
 
 @app.post("/subscribe")
 async def subscribe(sub: Subscription):
