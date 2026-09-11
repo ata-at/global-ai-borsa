@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d12"><link rel="manifest" href="manifest.json">
+<title>Global AI Borsa</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080a0f;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:720px;margin:auto;padding:14px 14px 90px}.top{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:23px;margin:8px 0}.muted{color:#8d96a8;font-size:12px}.card{background:#11151d;border:1px solid #202633;border-radius:18px;padding:14px;margin-top:12px}
+.row{display:flex;gap:8px}.row>*{flex:1}input,button{border-radius:12px;border:1px solid #2a3240;background:#151a23;color:#fff;padding:12px;font-size:15px}button{font-weight:700}
+.score{font-size:44px;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric{background:#0c1017;border-radius:13px;padding:10px}.metric b{display:block;font-size:17px;margin-top:3px}
+canvas{width:100%;height:270px;background:#0a0d13;border-radius:14px;margin-top:12px}.signal{font-weight:800}#status{font-size:12px;color:#98a2b3;margin-top:7px}.reason{padding:7px 0;border-bottom:1px solid #202633;font-size:13px}
+</style></head><body><main>
+<div class="top"><div><h1>Global AI Borsa</h1><div class="muted">Gerçek veri • AI sinyal motoru</div></div><button id="pushBtn">🔔 Bildirim</button></div>
+<div class="card"><div class="row"><input id="symbol" value="NASDAQ:AAPL"><button id="scanBtn">Analiz Et</button></div><div id="status">Sunucu bekleniyor…</div></div>
+<div class="card"><div class="muted">AI SCORE</div><div class="score" id="score">—</div><div class="signal" id="signal">—</div><canvas id="chart" width="690" height="270"></canvas></div>
+<div class="card grid">
+<div class="metric"><span class="muted">Fiyat</span><b id="price">—</b></div>
+<div class="metric"><span class="muted">Güven</span><b id="confidence">—</b></div>
+<div class="metric"><span class="muted">Giriş</span><b id="entry">—</b></div>
+<div class="metric"><span class="muted">Stop</span><b id="stop">—</b></div>
+<div class="metric"><span class="muted">Destek</span><b id="support">—</b></div>
+<div class="metric"><span class="muted">Direnç</span><b id="resistance">—</b></div>
+<div class="metric"><span class="muted">Hedef 1</span><b id="t1">—</b></div>
+<div class="metric"><span class="muted">Hedef 2</span><b id="t2">—</b></div></div>
+<div class="card"><div class="muted">NEDEN BU SKOR?</div><div id="reasons"></div></div>
+</main>
+<script src="config.js"></script><script>
+const API=window.APP_CONFIG.API_BASE_URL.replace(/\/$/,""),$=id=>document.getElementById(id);
+async function get(p){const r=await fetch(API+p);if(!r.ok)throw Error(await r.text());return r.json()}
+function show(x){
+ $("score").textContent=x.score??"—";$("signal").textContent=x.signal??"—";$("price").textContent=x.price??"—";
+ $("confidence").textContent=(x.confidence??"—")+"%";$("entry").textContent=x.entry_zone?.join(" – ")??"—";
+ $("stop").textContent=x.stop??"—";$("support").textContent=x.support??"—";$("resistance").textContent=x.resistance??"—";
+ $("t1").textContent=x.targets?.[0]??"—";$("t2").textContent=x.targets?.[1]??"—";
+ $("reasons").innerHTML=(x.reasons||[]).map(r=>`<div class="reason">• ${r}</div>`).join("")
+}
+function draw(a,l){
+ const c=$("chart"),ctx=c.getContext("2d"),W=c.width,H=c.height;ctx.clearRect(0,0,W,H);if(!a?.length)return;
+ const vals=a.flatMap(x=>[x.low,x.high]),lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo)*.08,L=lo-pad,U=hi+pad;
+ const px=i=>35+i*(W-55)/(a.length-1),py=v=>H-25-(v-L)*(H-45)/(U-L);
+ ctx.beginPath();a.forEach((x,i)=>i?ctx.lineTo(px(i),py(x.close)):ctx.moveTo(px(i),py(x.close)));ctx.stroke();
+ for(const [n,v] of [["support",l.support],["resistance",l.resistance],["stop",l.stop],["target",l.targets?.[0]]]){
+  if(v==null)continue;ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(0,py(v));ctx.lineTo(W,py(v));ctx.stroke();ctx.fillText(n+" "+v,8,Math.max(12,py(v)-4))
+ }ctx.setLineDash([])
+}
+async function load(){
+ const s=$("symbol").value.trim();$("status").textContent="Gerçek veri çekiliyor…";
+ try{const[x,ch]=await Promise.all([get("/signal/"+encodeURIComponent(s)),get("/chart/"+encodeURIComponent(s))]);show(x);draw(ch.candles,ch.levels);$("status").textContent="Son güncelleme: "+new Date().toLocaleTimeString()}
+ catch(e){$("status").textContent="Hata: "+e.message}
+}
+$("scanBtn").onclick=load;setInterval(()=>{if(document.visibilityState==="visible")load()},60000);
+async function enablePush(){
+ if(!("serviceWorker"in navigator)||!("PushManager"in window)){alert("Web Push desteklenmiyor.");return}
+ const reg=await navigator.serviceWorker.register("sw.js"),perm=await Notification.requestPermission();
+ if(perm!=="granted")return alert("Bildirim izni verilmedi.");
+ const key=APP_CONFIG.VAPID_PUBLIC_KEY;
+ if(!key||key.includes("BURAYA"))return alert("config.js içine VAPID public key yazın.");
+ const pad="=".repeat((4-key.length%4)%4),raw=atob((key+pad).replace(/-/g,"+").replace(/_/g,"/"));
+ const arr=new Uint8Array([...raw].map(c=>c.charCodeAt(0)));
+ const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:arr});
+ await fetch(API+"/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)});
+ alert("Bildirimler açıldı.")
+}
+$("pushBtn").onclick=enablePush;load();
+</script></body></html>
