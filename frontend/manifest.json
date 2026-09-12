@@ -1,10 +1,20 @@
 {
-  "id":"./",
-  "name":"Global AI Borsa",
-  "short_name":"AI Borsa",
-  "start_url":"./",
-  "display":"standalone",
-  "background_color":"#080a0f",
-  "theme_color":"#0b0d12",
-  "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "manifest_version": 3,
+  "name": "Global AI Borsa Terminali",
+  "version": "1.0",
+  "description": "Anlık Binance Verileri ve Yapay Zeka Finans Asistanı",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://binance.com*",
+    "wss://://binance.com*"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "sw.js"
+  }
 }
