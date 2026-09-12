@@ -11,14 +11,13 @@
         .row{display:flex;gap:8px}.row>*{flex:1}input{background:#161922;border:1px solid #262a36;padding:12px;color:#fff;border-radius:8px;font-size:15px;outline:none}
         .score{font-size:44px;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
         canvas{width:100%;height:300px;background:#161922;border-radius:12px;border:1px solid #262a36;display:block}
-        .reason-box{background:#1e2330;border-left:4px solid #f3ba2f;padding:14px;border-radius:8px;margin-top:10px}
+        .reason-box{background:#1e2330;border-left:4px solid #f3ba2f;padding:14px;border-radius:8px;margin-top:10px;font-size:14px;line-height:1.5}
     </style></head><body><main>
     <div class="top"><div><h1>Global AI Borsa</h1><div class="muted">Gerçek veri • Binance Mum Grafik Motoru</div></div></div>
     <div class="card"><div class="row"><input id="symbol" value="BTC"><input type="button" id="scanBtn" value="Analiz Et" style="background:#f3ba2f;border:none;color:#000;font-weight:bold;cursor:pointer;border-radius:8px"></div></div>
     <div class="card"><div class="muted">AI SCORE</div><div class="score" id="score">-</div><div id="signal" style="font-weight:bold;margin-top:4px">-</div></div>
     <canvas id="chart" width="700" height="300"></canvas>
     
-    <!-- YAPAY ZEKA ANLIK HABER GEREKÇE KUTUSU (YENİ) -->
     <div class="card">
         <div class="muted">🤖 YAPAY ZEKA HABER & SOSYAL MEDYA GEREKÇESİ</div>
         <div class="reason-box" id="aiNewsReason">Piyasa haber akışları ve lider tweetleri anlık analiz ediliyor...</div>
@@ -53,17 +52,16 @@ function show(x){
     $("t1").textContent=x.targets?.[0]??"-";
     $("t2").textContent=x.targets?.[1]??"-";
     $("reasons").innerHTML=(x.reasons||[]).map(r=>`<li>${r}</li>`).join("");
-    if(x.news_reason) $("aiNewsReason").textContent = x.news_reason; // Gerekçe kutusunu besleme
+    if(x.news_reason) $("aiNewsReason").textContent = x.news_reason;
 }
 
-// BİNANCE TARZI Gelişmiş MUM GRAFİK ÇİZİCİ FONKSİYONU
 function drawBinanceCandles(data) {
     const canvas = $("chart");
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!data || data.length === 0) return;
 
-    const tailData = data.slice(-40); // Son 40 mumu ekrana sığdırıyoruz
+    const tailData = data.slice(-40);
     const highs = tailData.map(d => d.high);
     const lows = tailData.map(d => d.low);
     const maxPrice = Math.max(...highs);
@@ -75,33 +73,27 @@ function drawBinanceCandles(data) {
 
     tailData.forEach((d, i) => {
         const x = i * (candleWidth + spacing) + spacing;
-        
-        // Fiyat noktalarını piksel koordinatına çevirme
         const yOpen = canvas.height - ((d.open - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
         const yClose = canvas.height - ((d.close - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
         const yHigh = canvas.height - ((d.high - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
         const yLow = canvas.height - ((d.low - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
 
         const isBullish = d.close >= d.open;
-        ctx.strokeStyle = isBullish ? "#0ecb81" : "#f6465d"; // Binance Yeşili ve Kırmızısı
+        ctx.strokeStyle = isBullish ? "#0ecb81" : "#f6465d";
         ctx.fillStyle = isBullish ? "#0ecb81" : "#f6465d";
         ctx.lineWidth = 1.5;
 
-        // 1. Fitil Çizimi (Gölge)
         ctx.beginPath(); ctx.moveTo(x + candleWidth / 2, yHigh); ctx.lineTo(x + candleWidth / 2, yLow); ctx.stroke();
-
-        // 2. Mum Gövde Çizimi
         const top = Math.min(yOpen, yClose);
-        const height = Math.max(Math.abs(yOpen - yClose), 2); // En az 2 piksel gövde kalınlığı
+        const height = Math.max(Math.abs(yOpen - yClose), 2);
         ctx.fillRect(x, top, candleWidth, height);
 
-        # 3. YAPAY ZEKA DESTEKLİ FORMASYON İŞARETLEME VE ETİKETLEME
         if (d.pattern) {
-            ctx.fillStyle = "#f3ba2f"; // Binance Sarısı etiket
-            ctx.font = "bold 9px sans-serif";
+            ctx.fillStyle = "#f3ba2f";
+            ctx.font = "bold 10px sans-serif";
             ctx.textAlign = "center";
             ctx.fillText("▲ AI", x + candleWidth / 2, yHigh - 12);
-            ctx.fillText(d.pattern.split(" ")[0], x + candleWidth / 2, yHigh - 4);
+            ctx.fillText(d.pattern, x + candleWidth / 2, yHigh - 3);
         }
     });
 }
