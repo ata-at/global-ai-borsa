@@ -10,11 +10,20 @@
         h1{font-size:23px;margin:8px 0}.muted{color:#8a8d98;font-size:13px}
         .row{display:flex;gap:8px}.row>*{flex:1}input{background:#161922;border:1px solid #262a36;padding:12px;color:#fff;border-radius:8px;font-size:15px;outline:none}
         .score{font-size:44px;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-        canvas{width:100%;height:270px;background:#161922;border-radius:12px;border:1px solid #262a36}
+        canvas{width:100%;height:300px;background:#161922;border-radius:12px;border:1px solid #262a36;display:block}
+        .reason-box{background:#1e2330;border-left:4px solid #f3ba2f;padding:14px;border-radius:8px;margin-top:10px}
     </style></head><body><main>
-    <div class="top"><div><h1>Global AI Borsa</h1><div class="muted">Gerçek veri • Al sinyal motoru</div></div></div>
-    <div class="card"><div class="row"><input id="symbol" value="BTC"><input type="button" id="scanBtn" value="Analiz Et" style="background:#2563eb;border:none;color:#fff;font-weight:bold;cursor:pointer;border-radius:8px"></div></div>
+    <div class="top"><div><h1>Global AI Borsa</h1><div class="muted">Gerçek veri • Binance Mum Grafik Motoru</div></div></div>
+    <div class="card"><div class="row"><input id="symbol" value="BTC"><input type="button" id="scanBtn" value="Analiz Et" style="background:#f3ba2f;border:none;color:#000;font-weight:bold;cursor:pointer;border-radius:8px"></div></div>
     <div class="card"><div class="muted">AI SCORE</div><div class="score" id="score">-</div><div id="signal" style="font-weight:bold;margin-top:4px">-</div></div>
+    <canvas id="chart" width="700" height="300"></canvas>
+    
+    <!-- YAPAY ZEKA ANLIK HABER GEREKÇE KUTUSU (YENİ) -->
+    <div class="card">
+        <div class="muted">🤖 YAPAY ZEKA HABER & SOSYAL MEDYA GEREKÇESİ</div>
+        <div class="reason-box" id="aiNewsReason">Piyasa haber akışları ve lider tweetleri anlık analiz ediliyor...</div>
+    </div>
+
     <div class="card"><div class="muted">Anlık Durum ve Seviyeler</div><div id="confidence" style="margin-top:4px;font-weight:bold;color:#10b981">-</div></div>
     <div class="card grid">
         <div class="metric"><span class="muted">Fiyat:</span> <span id="price">-</span></div>
@@ -25,14 +34,12 @@
         <div class="metric"><span class="muted">Hedef 1:</span> <span id="t1">-</span></div>
         <div class="metric"><span class="muted">Hedef 2:</span> <span id="t2">-</span></div>
     </div>
-    <canvas id="chart"></canvas>
     <div class="card"><div class="muted">NEDEN BU SKOR?</div><ul id="reasons" style="padding-left:20px;margin:8px 0;line-height:1.6"></ul></div>
 </main>
 <script src="config.js"></script>
 <script>
 const API = window.APP_CONFIG.API_BASE_URL;
 const $ = id => document.getElementById(id);
-async function get(p){const r=await fetch(API+p);return r.ok?r.json():null}
 
 function show(x){
     $("score").textContent=x.score??"-";
@@ -46,51 +53,69 @@ function show(x){
     $("t1").textContent=x.targets?.[0]??"-";
     $("t2").textContent=x.targets?.[1]??"-";
     $("reasons").innerHTML=(x.reasons||[]).map(r=>`<li>${r}</li>`).join("");
+    if(x.news_reason) $("aiNewsReason").textContent = x.news_reason; // Gerekçe kutusunu besleme
 }
 
-function draw(candles, levels){
+// BİNANCE TARZI Gelişmiş MUM GRAFİK ÇİZİCİ FONKSİYONU
+function drawBinanceCandles(data) {
     const canvas = $("chart");
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(!candles||candles.length===0) return;
-    
-    const closes = candles.map(c => c.close);
-    const min = Math.min(...closes);
-    const max = Math.max(...closes);
-    const range = max - min || 1;
-    
-    ctx.beginPath();
-    ctx.strokeStyle = "#2563eb";
-    ctx.lineWidth = 3;
-    
-    candles.forEach((c, i) => {
-        const x = (i / (candles.length - 1)) * canvas.width;
-        const y = canvas.height - ((c.close - min) / range) * canvas.height * 0.8 - canvas.height * 0.1;
-        if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!data || data.length === 0) return;
+
+    const tailData = data.slice(-40); // Son 40 mumu ekrana sığdırıyoruz
+    const highs = tailData.map(d => d.high);
+    const lows = tailData.map(d => d.low);
+    const maxPrice = Math.max(...highs);
+    const minPrice = Math.min(...lows);
+    const priceRange = maxPrice - minPrice || 1;
+
+    const candleWidth = (canvas.width / tailData.length) * 0.7;
+    const spacing = (canvas.width / tailData.length) * 0.3;
+
+    tailData.forEach((d, i) => {
+        const x = i * (candleWidth + spacing) + spacing;
+        
+        // Fiyat noktalarını piksel koordinatına çevirme
+        const yOpen = canvas.height - ((d.open - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
+        const yClose = canvas.height - ((d.close - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
+        const yHigh = canvas.height - ((d.high - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
+        const yLow = canvas.height - ((d.low - minPrice) / priceRange) * canvas.height * 0.8 - canvas.height * 0.1;
+
+        const isBullish = d.close >= d.open;
+        ctx.strokeStyle = isBullish ? "#0ecb81" : "#f6465d"; // Binance Yeşili ve Kırmızısı
+        ctx.fillStyle = isBullish ? "#0ecb81" : "#f6465d";
+        ctx.lineWidth = 1.5;
+
+        // 1. Fitil Çizimi (Gölge)
+        ctx.beginPath(); ctx.moveTo(x + candleWidth / 2, yHigh); ctx.lineTo(x + candleWidth / 2, yLow); ctx.stroke();
+
+        // 2. Mum Gövde Çizimi
+        const top = Math.min(yOpen, yClose);
+        const height = Math.max(Math.abs(yOpen - yClose), 2); // En az 2 piksel gövde kalınlığı
+        ctx.fillRect(x, top, candleWidth, height);
+
+        # 3. YAPAY ZEKA DESTEKLİ FORMASYON İŞARETLEME VE ETİKETLEME
+        if (d.pattern) {
+            ctx.fillStyle = "#f3ba2f"; // Binance Sarısı etiket
+            ctx.font = "bold 9px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("▲ AI", x + candleWidth / 2, yHigh - 12);
+            ctx.fillText(d.pattern.split(" ")[0], x + candleWidth / 2, yHigh - 4);
+        }
     });
-    ctx.stroke();
-    
-    if(levels && levels.support){
-        ctx.setLineDash([5, 5]);
-        ctx.strokeStyle = "#10b981";
-        const sy = canvas.height - ((levels.support - min) / range) * canvas.height * 0.8 - canvas.height * 0.1;
-        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy); ctx.stroke();
-    }
-    if(levels && levels.resistance){
-        ctx.setLineDash([5, 5]);
-        ctx.strokeStyle = "#ef4444";
-        const ry = canvas.height - ((levels.resistance - min) / range) * canvas.height * 0.8 - canvas.height * 0.1;
-        ctx.beginPath(); ctx.moveTo(0, ry); ctx.lineTo(canvas.width, ry); ctx.stroke();
-    }
-    ctx.setLineDash([]);
 }
 async function load(){
     const s=$("symbol").value.trim();
     $("scanBtn").value="Hesaplanıyor...";
     try{
-        const [x, ch]=await Promise.all([get("/signal/"+s), get("/chart/"+s)]);
-        if(x) { show(x); if(ch) draw(ch, x); }
-    }catch(e){}
+        const r=await fetch(API+"/signal/"+s);
+        const x=r.ok?await r.json():null;
+        const r2=await fetch(API+"/chart/"+s);
+        const ch=r2.ok?await r2.json():null;
+        
+        if(x) { show(x); if(ch) drawBinanceCandles(ch); }
+    }catch(e){console.log(e)}
     $("scanBtn").value="Analiz Et";
 }
 $("scanBtn").onclick=load;
